@@ -1,1 +1,5 @@
 # Dicom-PET
+
+pet_SUV.pyを用いることで複数症例のフォルダに含まれるDICOMファイルからSUV値のPET画像のMIP画像を保存することができます。
+
+dicom-learn.pyを用いることで正常症例と以上症例のデータセットをmydatasetのtrainフォルダとvalフォルダに入れることで二値分類を行うモデルを作成することができます。
