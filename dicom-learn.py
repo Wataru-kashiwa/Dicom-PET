@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from IPython import display
 from PIL import Image
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,22 +13,14 @@ import torch.utils.data as data
 import torchvision.datasets as datasets
 import torchvision.models as models
 import torchvision.transforms as transforms
-
-def run():
-    torch.multiprocessing.freeze_support()
-    print('loop')
-
-if __name__ == '__main__':
-    run()
-
-
+# %%
 dataset_dir = Path("mydataset")  # my_dataset ディレクトリのパス
-
+# %%
 data_transforms = {
     # 学習時の Transform
     "train": transforms.Compose(
         [
-            transforms.RandomResizedCrop(224),
+            # transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -38,27 +29,28 @@ data_transforms = {
     # 推論時の Transform
     "val": transforms.Compose(
         [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            # transforms.Resize(256),
+            # transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     ),
 }
-
+# %%
 # Dataset を作成する。
 img_datasets = {
     x: datasets.ImageFolder(dataset_dir / x, data_transforms[x])
     for x in ["train", "val"]
 }
-
+# %%
 class_names = img_datasets["train"].classes
-
+print(class_names)
+# %%
 dataloaders = {
-    x: data.DataLoader(img_datasets[x], batch_size=4, shuffle=True, num_workers=4)
+    x: data.DataLoader(img_datasets[x], batch_size=4, shuffle=True, num_workers=0)
     for x in ["train", "val"]
 }
-
+# %%
 def get_device(gpu_id=-1):
     if gpu_id >= 0 and torch.cuda.is_available():
         return torch.device("cuda", gpu_id)
@@ -67,7 +59,7 @@ def get_device(gpu_id=-1):
 
 
 device = get_device(gpu_id=0)
-
+# %%
 def train(model, criterion, optimizer, scheduler, dataloaders, device, n_epochs):
     """指定したエポック数だけ学習する。
     """
@@ -103,6 +95,7 @@ def train_on_epoch(model, criterion, optimizer, scheduler, dataloaders, device):
         for inputs, labels in dataloaders[phase]:
             # データ及びラベルを計算を実行するデバイスに転送する。
             inputs, labels = inputs.to(device), labels.to(device)
+
             # 学習時は勾配を計算するため、set_grad_enabled(True) で中間層の出力を記録するように設定する。
             with torch.set_grad_enabled(phase == "train"):
                 # 順伝搬を行う。
@@ -134,7 +127,7 @@ def train_on_epoch(model, criterion, optimizer, scheduler, dataloaders, device):
         info[f"{phase}_accuracy"] = total_correct / len(dataloaders[phase].dataset)
 
     return info
-
+# %%
 def plot_history(history):
     fig, [ax1, ax2] = plt.subplots(1, 2, figsize=(8, 3))
 
@@ -153,7 +146,7 @@ def plot_history(history):
     ax2.legend()
 
     plt.show()
-
+# %%
 # ResNet-18 を作成する。
 model_ft = models.resnet18(pretrained=True)
 
@@ -169,14 +162,38 @@ criterion = nn.CrossEntropyLoss()
 # 最適化手法を選択する。
 optimizer = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-
-
+# %%
 n_epochs = 10  # エポック数
 history = train(
     model_ft, criterion, optimizer, scheduler, dataloaders, device, n_epochs
 )
 
 plot_history(history)
-
-
 # %%
+
+def show_prediction(model, transform, imgs, n=1):
+    for img in imgs:
+        # 1. PIL Image を標準化したテンソルにする。
+        # 2. バッチ次元を追加する。 (C, H, W) -> (1, C, H, W)
+        # 3. 計算するデバイスに転送する。
+        inputs = transform(img.convert('RGB')).unsqueeze(dim=0).to(device)
+
+        with torch.no_grad():
+            # 順伝搬を行う。
+            outputs = model(inputs)
+
+            # 確率の最も高いクラスを予測ラベルとする。
+            class_id = int(outputs.argmax(dim=1)[0])
+
+        # 推論結果を表示する。
+        display.display(img.resize((224, 224)))
+        print(class_names[class_id])
+
+
+imgs = []
+for class_dir in (dataset_dir / "val").iterdir():
+    for img_path in sorted(class_dir.iterdir())[:2]:
+        img = Image.open(img_path)
+        imgs.append(img)
+
+show_prediction(model_ft, data_transforms["val"], imgs)
