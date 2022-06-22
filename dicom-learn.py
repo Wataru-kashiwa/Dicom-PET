@@ -197,3 +197,6 @@ for class_dir in (dataset_dir / "val").iterdir():
         imgs.append(img)
 
 show_prediction(model_ft, data_transforms["val"], imgs)
+
+model_path = 'model.pth'
+torch.save(model_ft.state_dict(), model_path)
